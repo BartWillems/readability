@@ -7,7 +7,7 @@ use std::str::FromStr;
 
 pub fn get_tag_name(handle: Handle) -> Option<String> {
     match handle.data {
-        Element { ref name, .. } => Some(name.local.as_ref().to_lowercase().to_string()),
+        Element { ref name, .. } => Some(name.local.as_ref().to_lowercase()),
         _ => None,
     }
 }
@@ -16,15 +16,15 @@ pub fn get_attr(name: &str, handle: Handle) -> Option<String> {
     match handle.data {
         Element {
             name: _, ref attrs, ..
-        } => attr(name, &attrs.borrow()),
+        } => attr(name, &attrs.borrow()).map(ToString::to_string),
         _ => None,
     }
 }
 
-pub fn attr(attr_name: &str, attrs: &[Attribute]) -> Option<String> {
+pub fn attr<'a>(attr_name: &str, attrs: &'a [Attribute]) -> Option<&'a str> {
     for attr in attrs.iter() {
         if attr.name.local.as_ref() == attr_name {
-            return Some(attr.value.to_string());
+            return Some(attr.value.as_ref());
         }
     }
     None
@@ -147,6 +147,39 @@ pub fn find_node(handle: Handle, tag_name: &str, nodes: &mut Vec<Rc<Node>>) {
     }
 }
 
+pub fn count_nodes(handle: Handle, tag_name: &str) -> usize {
+    let mut sum = 0;
+    for child in handle.children.borrow().iter() {
+        let c = child.clone();
+        if let Element { ref name, .. } = c.data {
+            let t = name.local.as_ref();
+            if t.to_lowercase() == tag_name {
+                sum += 1;
+            };
+            sum += count_nodes(child.clone(), tag_name);
+        }
+    }
+    sum
+}
+
+// pub fn has_nodes(handle: Handle, tag_names: &Vec<&'static str>) -> bool {
+//     for child in handle.children.borrow().iter() {
+//         if let Some(tag_name) = &get_tag_name(child.clone()) {
+//             if tag_names.contains(&tag_name.as_str()) {
+//                 return true;
+//             }
+//         };
+
+//         if match child.clone().data {
+//             Element { .. } => has_nodes(child.clone(), tag_names),
+//             _ => false,
+//         } {
+//             return true;
+//         }
+//     }
+//     false
+// }
+
 pub fn has_nodes(handle: Handle, tag_names: &Vec<&'static str>) -> bool {
     for child in handle.children.borrow().iter() {
         let tag_name: &str = &get_tag_name(child.clone()).unwrap_or_default();
@@ -162,6 +195,23 @@ pub fn has_nodes(handle: Handle, tag_names: &Vec<&'static str>) -> bool {
     }
     false
 }
+
+// /// Get the number of child elemenents(?) of type `NodeData::Text` that have
+// /// a trimmed text length of at least 20.
+// pub fn text_children_count(handle: Handle) -> usize {
+//     handle
+//         .children
+//         .borrow()
+//         .iter()
+//         .filter(|child| {
+//             if let Text { contents } = &child.data {
+//                 return contents.borrow().trim().len() >= 20;
+//             } else {
+//                 false
+//             }
+//         })
+//         .count()
+// }
 
 pub fn text_children_count(handle: Handle) -> usize {
     let mut count = 0;

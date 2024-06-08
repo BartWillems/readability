@@ -1,4 +1,4 @@
-use dom;
+use crate::dom;
 use html5ever::tree_builder::TreeSink;
 use html5ever::tree_builder::{ElementFlags, NodeOrText};
 use html5ever::{LocalName, QualName};
@@ -53,31 +53,22 @@ pub struct Candidate {
     pub score: Cell<f32>,
 }
 
-pub fn fix_img_path(handle: Handle, url: &Url) -> bool {
-    let src = dom::get_attr("src", handle.clone());
-    let s = match src {
-        Some(src) => src,
-        None => return false,
+/// Let the resource point to an absolute path if it isn't already the case
+///
+/// `<a href="target.html">` -> `<a href="https://website.com/target.html">`
+///
+/// Returns false if the element doesn't contain a link attribute (`src`, `href`, ...)
+pub fn fix_resource_link(handle: Handle, url: &Url, attribute: &str) -> bool {
+    let Some(src) = dom::get_attr(attribute, handle.clone()) else {
+        return false;
     };
-    if !s.starts_with("//") && !s.starts_with("http://") && !s.starts_with("https://") {
-        if let Ok(new_url) = url.join(&s) {
-            dom::set_attr("src", new_url.as_str(), handle)
-        }
-    }
-    true
-}
 
-pub fn fix_anchor_path(handle: Handle, url: &Url) -> bool {
-    let src = dom::get_attr("href", handle.clone());
-    let s = match src {
-        Some(src) => src,
-        None => return false,
-    };
-    if !s.starts_with("//") && !s.starts_with("http://") && !s.starts_with("https://") {
-        if let Ok(new_url) = url.join(&s) {
-            dom::set_attr("href", new_url.as_str(), handle)
+    if !src.starts_with("//") && !src.starts_with("http://") && !src.starts_with("https://") {
+        if let Ok(new_url) = url.join(&src) {
+            dom::set_attr(attribute, new_url.as_str(), handle)
         }
     }
+
     true
 }
 
@@ -141,10 +132,10 @@ pub fn get_class_weight(handle: Handle) -> f32 {
     {
         for name in ["id", "class"].iter() {
             if let Some(val) = dom::attr(name, &attrs.borrow()) {
-                if POSITIVE.is_match(&val) {
+                if POSITIVE.is_match(val) {
                     weight += 25.0
                 };
-                if NEGATIVE.is_match(&val) {
+                if NEGATIVE.is_match(val) {
                     weight -= 25.0
                 }
             }
@@ -168,7 +159,7 @@ pub fn preprocess(dom: &mut RcDom, handle: Handle, title: &mut String) -> bool {
         }
         for name in ["id", "class"].iter() {
             if let Some(val) = dom::attr(name, &attrs.borrow()) {
-                if tag_name != "body" && UNLIKELY.is_match(&val) && !LIKELY.is_match(&val) {
+                if tag_name != "body" && UNLIKELY.is_match(val) && !LIKELY.is_match(val) {
                     return true;
                 }
             }
@@ -334,8 +325,8 @@ pub fn clean(
                 "form" | "table" | "ul" | "div" => {
                     useless = is_useless(id, handle.clone(), candidates)
                 }
-                "img" => useless = !fix_img_path(handle.clone(), url),
-                "a" => useless = !fix_anchor_path(handle.clone(), url),
+                "img" => useless = !fix_resource_link(handle.clone(), url, "src"),
+                "a" => useless = !fix_resource_link(handle.clone(), url, "href"),
                 _ => (),
             }
             dom::clean_attr("id", &mut attrs.borrow_mut());
@@ -372,21 +363,13 @@ pub fn is_useless(id: &Path, handle: Handle, candidates: &BTreeMap<String, Candi
         return true;
     }
     let text_nodes_len = dom::text_children_count(handle.clone());
-    let mut p_nodes: Vec<Rc<Node>> = vec![];
-    let mut img_nodes: Vec<Rc<Node>> = vec![];
-    let mut li_nodes: Vec<Rc<Node>> = vec![];
-    let mut input_nodes: Vec<Rc<Node>> = vec![];
-    let mut embed_nodes: Vec<Rc<Node>> = vec![];
-    dom::find_node(handle.clone(), "p", &mut p_nodes);
-    dom::find_node(handle.clone(), "img", &mut img_nodes);
-    dom::find_node(handle.clone(), "li", &mut li_nodes);
-    dom::find_node(handle.clone(), "input", &mut input_nodes);
-    dom::find_node(handle.clone(), "embed", &mut embed_nodes);
-    let p_count = p_nodes.len();
-    let img_count = img_nodes.len();
-    let li_count = li_nodes.len() as i32 - 100;
-    let input_count = input_nodes.len();
-    let embed_count = embed_nodes.len();
+
+    let p_count = dom::count_nodes(handle.clone(), "p");
+    let img_count = dom::count_nodes(handle.clone(), "img");
+    let li_count = dom::count_nodes(handle.clone(), "li") as isize - 100;
+    let input_count = dom::count_nodes(handle.clone(), "input");
+    let embed_count = dom::count_nodes(handle.clone(), "embed");
+
     let link_density = get_link_density(handle.clone());
     let content_length = dom::text_len(handle.clone());
     let para_count = text_nodes_len + p_count;
@@ -394,7 +377,7 @@ pub fn is_useless(id: &Path, handle: Handle, candidates: &BTreeMap<String, Candi
     if img_count > para_count + text_nodes_len {
         return true;
     }
-    if li_count > para_count as i32 && tag_name != "ul" && tag_name != "ol" {
+    if li_count > para_count as isize && tag_name != "ul" && tag_name != "ol" {
         return true;
     }
     if input_count as f32 > f32::floor(para_count as f32 / 3.0) {

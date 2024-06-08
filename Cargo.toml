@@ -1,26 +1,20 @@
 [package]
 name = "readability"
 version = "0.3.0"
-authors = ["Hiroki Kumamoto <kumabook@live.jp>"]
+authors = ["Hiroki Kumamoto <kumabook@live.jp>", "bwillems@pm.me"]
 license = "MIT"
 homepage = "https://github.com/kumabook/readability"
 repository = "https://github.com/kumabook/readability.git"
-description = "Port of arc90's readability project to rust"
+description = "Fork of Hiroki Kumamoto's port of arc90's readability project to rust"
 keywords = ["readability"]
 categories = []
+edition = "2021"
 
 [dependencies]
+displaydoc = "0.2"
 regex = "1.9"
 url = "2.4"
-html5ever = "0.26"
-markup5ever_rcdom = "0.2"
+html5ever = "0.27"
+markup5ever_rcdom = "0.3"
 lazy_static = "1.4"
-
-[dependencies.reqwest]
-version = "0.11"
-optional = true
-features = ["blocking", "rustls-tls"]
-default-features = false
-
-[features]
-default = ["reqwest"]
+thiserror = "1"
