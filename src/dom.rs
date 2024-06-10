@@ -36,27 +36,30 @@ pub fn set_attr(attr_name: &str, value: &str, handle: Handle) {
     } = handle.data
     {
         let attrs = &mut attrs.borrow_mut();
-        if let Some(index) = attrs.iter().position(|attr| {
+
+        for attr in attrs.iter_mut() {
             let name = attr.name.local.as_ref();
-            name == attr_name
-        }) {
-            if let Ok(value) = StrTendril::from_str(value) {
-                attrs[index] = Attribute {
-                    name: attrs[index].name.clone(),
-                    value,
+
+            if name == attr_name {
+                if let Ok(tendril) = StrTendril::from_str(value) {
+                    *attr = Attribute {
+                        name: attr.name.clone(),
+                        value: tendril,
+                    };
+
+                    return;
                 }
             }
         }
     }
 }
 
-pub fn clean_attr(attr_name: &str, attrs: &mut Vec<Attribute>) {
-    if let Some(index) = attrs.iter().position(|attr| {
-        let name = attr.name.local.as_ref();
-        name == attr_name
-    }) {
-        attrs.remove(index);
-    }
+pub fn filter_attributes(attributes: &[Attribute], filter: &[&str]) -> Vec<Attribute> {
+    attributes
+        .iter()
+        .cloned()
+        .filter(|attribute| !filter.contains(&attribute.name.local.as_ref()))
+        .collect()
 }
 
 pub fn is_empty(handle: Handle) -> bool {
@@ -180,6 +183,7 @@ pub fn count_nodes(handle: Handle, tag_name: &str) -> usize {
 //     false
 // }
 
+/// Check if a node has a child note (at any depth) from the `tag_names` list
 pub fn has_nodes(handle: Handle, tag_names: &Vec<&'static str>) -> bool {
     for child in handle.children.borrow().iter() {
         let tag_name: &str = &get_tag_name(child.clone()).unwrap_or_default();

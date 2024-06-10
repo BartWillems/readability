@@ -329,9 +329,10 @@ pub fn clean(
                 "a" => useless = !fix_resource_link(handle.clone(), url, "href"),
                 _ => (),
             }
-            dom::clean_attr("id", &mut attrs.borrow_mut());
-            dom::clean_attr("class", &mut attrs.borrow_mut());
-            dom::clean_attr("style", &mut attrs.borrow_mut());
+
+            let filtered = dom::filter_attributes(&attrs.borrow(), &["id", "class", "style"]);
+
+            *attrs.borrow_mut() = filtered;
         }
         ProcessingInstruction { .. } => unreachable!(),
     }
